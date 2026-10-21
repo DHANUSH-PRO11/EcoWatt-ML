@@ -1,0 +1,86 @@
+{
+  "trained_at": "2026-10-21T07:35:14.830754Z",
+  "dataset_rows": 4321,
+  "train_rows": 2907,
+  "val_rows": 623,
+  "test_rows": 623,
+  "is_simulated": true,
+  "best_model_name": "baseline",
+  "residual_std": 0.8599,
+  "feature_columns": [
+    "hour",
+    "day_of_week",
+    "day_of_month",
+    "month",
+    "is_weekend",
+    "sin_hour",
+    "cos_hour",
+    "sin_day_of_week",
+    "cos_day_of_week",
+    "sin_month",
+    "cos_month",
+    "lag_1",
+    "lag_2",
+    "lag_3",
+    "lag_24",
+    "lag_48",
+    "lag_168",
+    "rolling_mean_6",
+    "rolling_mean_24",
+    "rolling_std_24"
+  ],
+  "validation_metrics": {
+    "baseline": {
+      "mae": 0.3018,
+      "rmse": 0.8677,
+      "r2": 0.206
+    },
+    "linear_regression": {
+      "mae": 0.3879,
+      "rmse": 0.8878,
+      "r2": 0.1689
+    },
+    "random_forest": {
+      "mae": 0.3182,
+      "rmse": 0.8622,
+      "r2": 0.216
+    },
+    "hist_gradient_boosting": {
+      "mae": 0.3321,
+      "rmse": 0.8755,
+      "r2": 0.1917
+    }
+  },
+  "test_metrics": {
+    "baseline": {
+      "mae": 0.3282,
+      "rmse": 0.8349,
+      "r2": 0.2671
+    },
+    "linear_regression": {
+      "mae": 0.4029,
+      "rmse": 0.8673,
+      "r2": 0.209
+    },
+    "random_forest": {
+      "mae": 0.3163,
+      "rmse": 0.8156,
+      "r2": 0.3005
+    },
+    "hist_gradient_boosting": {
+      "mae": 0.3549,
+      "rmse": 0.8298,
+      "r2": 0.2759
+    }
+  },
+  "best_model_validation": {
+    "mae": 0.3018,
+    "rmse": 0.8677,
+    "r2": 0.206
+  },
+  "best_model_test": {
+    "mae": 0.3282,
+    "rmse": 0.8349,
+    "r2": 0.2671
+  }
+}
