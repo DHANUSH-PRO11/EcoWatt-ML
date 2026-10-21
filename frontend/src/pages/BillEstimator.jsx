@@ -32,6 +32,7 @@ export const BillEstimator = () => {
   const [loading, setLoading] = useState(true);
   const [savingTariff, setSavingTariff] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(null);
+  const [hoveredBarIndex, setHoveredBarIndex] = useState(null);
 
   // Editable slab rates in tariff state
   const [editableSlabs, setEditableSlabs] = useState([]);
@@ -129,7 +130,9 @@ export const BillEstimator = () => {
     rate: slab.rate_per_kwh,
   }));
 
-  const COLORS = ['#10B981', '#38BDF8', '#F59E0B', '#EF4444'];
+  // Professional emerald green theme palette
+  const TIER_COLORS = ['#10B981', '#34D399', '#059669', '#10B981'];
+  const HOVER_COLOR = '#6EE7B7';
 
   return (
     <div className="space-y-6">
@@ -373,10 +376,19 @@ export const BillEstimator = () => {
                     }}
                     formatter={(val) => [`${currencySymbol}${val}`, 'Cost Contribution']}
                   />
-                  <Bar dataKey="cost" name="Slab Cost" radius={[4, 4, 0, 0]}>
-                    {slabChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                  <Bar dataKey="cost" name="Slab Cost" fill="#10B981" radius={[4, 4, 0, 0]}>
+                    {slabChartData.map((entry, index) => {
+                      const isHovered = hoveredBarIndex === index;
+                      return (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={isHovered ? HOVER_COLOR : TIER_COLORS[index % TIER_COLORS.length]}
+                          cursor="pointer"
+                          onMouseEnter={() => setHoveredBarIndex(index)}
+                          onMouseLeave={() => setHoveredBarIndex(null)}
+                        />
+                      );
+                    })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
