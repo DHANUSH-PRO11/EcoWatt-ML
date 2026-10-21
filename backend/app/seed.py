@@ -16,10 +16,14 @@ from ml.config import HOURLY_DATA_FILE, METRICS_FILE
 from ml.dataset import get_or_load_dataset
 
 
+from backend.app.migration import run_safe_migrations
+
+
 def init_db():
-    """Create all database tables."""
-    print("Creating database schema...")
-    Base.metadata.create_all(bind=engine)
+    """Create all database tables and apply safe schema migrations."""
+    print("Creating database schema & running safe migrations...")
+    run_safe_migrations()
+
 
 
 def seed_database():

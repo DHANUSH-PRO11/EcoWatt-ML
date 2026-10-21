@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Index
+from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Index, ForeignKey
 from backend.app.database import Base
 
 
@@ -7,7 +7,9 @@ class EnergyReading(Base):
     __tablename__ = "energy_readings"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, nullable=False, unique=True, index=True)
+    building_id = Column(Integer, ForeignKey("buildings.id", ondelete="SET NULL"), nullable=True, index=True)
+    meter_id = Column(Integer, ForeignKey("energy_meters.id", ondelete="SET NULL"), nullable=True, index=True)
+    timestamp = Column(DateTime, nullable=False, index=True)
     energy_kwh = Column(Float, nullable=False)
     reactive_power_kvar = Column(Float, nullable=True)
     voltage = Column(Float, nullable=True)
@@ -21,4 +23,5 @@ class EnergyReading(Base):
 
     __table_args__ = (
         Index("idx_energy_timestamp_desc", timestamp.desc()),
+        Index("idx_energy_building_time", building_id, timestamp.desc()),
     )

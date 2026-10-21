@@ -7,6 +7,7 @@ import joblib
 
 from ml.config import (
     BEST_MODEL_FILE,
+    BASELINE_MODEL_FILE,
     METRICS_FILE,
     TARGET_COL,
     DATETIME_COL,
@@ -19,17 +20,21 @@ class RecursiveForecaster:
     """
     Handles multi-step recursive forecasting for arbitrary future horizons (1h, 24h, 168h).
     Dynamically propagates predicted consumption into lagged feature buffers
-    to guarantee zero lookahead bias while computing calibrated prediction intervals.
+    to guarantee zero lookahead bias while computing calibrated prediction intervals
+    and baseline comparisons.
     """
 
     def __init__(
         self,
         model_path: Path = BEST_MODEL_FILE,
+        baseline_path: Path = BASELINE_MODEL_FILE,
         metrics_path: Path = METRICS_FILE,
     ):
         self.model_path = model_path
+        self.baseline_path = baseline_path
         self.metrics_path = metrics_path
         self.model = None
+        self.baseline_model = None
         self.residual_std = 0.25
         self.model_name = "unknown"
         self._load_model_and_metadata()
@@ -39,6 +44,11 @@ class RecursiveForecaster:
             self.model = joblib.load(self.model_path)
         else:
             self.model = None
+
+        if Path(self.baseline_path).exists():
+            self.baseline_model = joblib.load(self.baseline_path)
+        else:
+            self.baseline_model = None
 
         if Path(self.metrics_path).exists():
             with open(self.metrics_path, "r") as f:
@@ -53,7 +63,7 @@ class RecursiveForecaster:
         confidence_level: float = 0.95,
     ) -> List[Dict[str, Any]]:
         """
-        Execute recursive multi-step forecasting.
+        Execute recursive multi-step forecasting with baseline comparison.
         horizon_hours: 1 (next hour), 24 (next day), 168 (next 7 days)
         """
         if self.model is None:
@@ -68,7 +78,7 @@ class RecursiveForecaster:
 
         last_timestamp = history[DATETIME_COL].iloc[-1]
 
-        # Multiplier for prediction intervals (1.96 for 95% confidence)
+        # Multiplier for prediction intervals (1.96 for 95% confidence, 1.645 for 90%)
         z_score = 1.96 if confidence_level >= 0.95 else 1.645
 
         # Recursive buffer containing timestamps and energy values
@@ -91,9 +101,20 @@ class RecursiveForecaster:
             pred_val = float(self.model.predict(features_df)[0])
             pred_val = max(0.05, pred_val)  # Physics constraint: energy >= baseload threshold
 
+            # Baseline point prediction
+            if self.baseline_model is not None:
+                try:
+                    baseline_val = float(self.baseline_model.predict(features_df)[0])
+                    baseline_val = max(0.05, baseline_val)
+                except Exception:
+                    baseline_val = pred_val
+            else:
+                baseline_val = pred_val
+
             # Uncertainty expands with recursive horizon
             # Step error propagation formula: sigma_h = residual_std * sqrt(1 + 0.04 * (step - 1))
-            step_sigma = self.residual_std * np.sqrt(1.0 + 0.04 * (step - 1))
+            uncert_mult = float(np.sqrt(1.0 + 0.04 * (step - 1)))
+            step_sigma = self.residual_std * uncert_mult
             lower_bound = float(max(0.0, pred_val - z_score * step_sigma))
             upper_bound = float(pred_val + z_score * step_sigma)
 
@@ -101,8 +122,10 @@ class RecursiveForecaster:
                 "step": step,
                 "timestamp": next_timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 "predicted_kwh": round(pred_val, 3),
+                "baseline_kwh": round(baseline_val, 3),
                 "lower_bound_kwh": round(lower_bound, 3),
                 "upper_bound_kwh": round(upper_bound, 3),
+                "uncertainty_multiplier": round(uncert_mult, 2),
                 "unit": "kWh",
                 "model_name": self.model_name,
             }

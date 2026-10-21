@@ -8,6 +8,11 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  Building2,
+  Download,
+  ShieldCheck,
+  HelpCircle,
+  BarChart2,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -21,13 +26,21 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { postForecast, getModelMetrics, retrainModel, getEnergyHistory } from '../api/client';
+import {
+  postForecast,
+  getModelMetrics,
+  retrainModelSafe,
+  getEnergyHistory,
+  getBuildings,
+} from '../api/client';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { MetricCard } from '../components/MetricCard';
 
 export const Forecasting = () => {
   const [horizon, setHorizon] = useState(24);
   const [confidence, setConfidence] = useState(0.95);
+  const [buildings, setBuildings] = useState([]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState('');
   const [forecastData, setForecastData] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [recentHistory, setRecentHistory] = useState([]);
@@ -36,16 +49,21 @@ export const Forecasting = () => {
   const [error, setError] = useState(null);
   const [retrainSuccess, setRetrainSuccess] = useState(null);
 
+  useEffect(() => {
+    getBuildings()
+      .then((blds) => setBuildings(blds))
+      .catch(() => {});
+  }, []);
+
   const fetchForecastAndMetrics = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Concurrent fetch
       const [forecastRes, metricsRes, historyRes] = await Promise.all([
-        postForecast(horizon, confidence),
+        postForecast(horizon, confidence, selectedBuildingId || null),
         getModelMetrics(),
-        getEnergyHistory({ limit: 24 }),
+        getEnergyHistory({ limit: 24, building_id: selectedBuildingId || null }),
       ]);
 
       setForecastData(forecastRes);
@@ -60,17 +78,15 @@ export const Forecasting = () => {
 
   useEffect(() => {
     fetchForecastAndMetrics();
-  }, [horizon, confidence]);
+  }, [horizon, confidence, selectedBuildingId]);
 
   const handleRetrain = async () => {
-    if (!window.confirm('Triggering ML model retraining will compare all 4 algorithms on chronological splits. Proceed?')) {
-      return;
-    }
+    if (!window.confirm('Trigger safe ML retraining across all 4 architectures?')) return;
     try {
       setRetraining(true);
       setRetrainSuccess(null);
-      const res = await retrainModel(false);
-      setRetrainSuccess(`Retraining completed! Best model selected: '${res.metrics?.best_model_name}'`);
+      const res = await retrainModelSafe(false);
+      setRetrainSuccess(res.message || 'Retraining complete');
       await fetchForecastAndMetrics();
     } catch (err) {
       alert(`Retraining failed: ${err.message}`);
@@ -79,7 +95,7 @@ export const Forecasting = () => {
     }
   };
 
-  // Combine tail of recent history with predictions for continuous chart
+  // Combine history with predictions for continuous chart
   const combinedChartData = [];
   if (recentHistory.length > 0) {
     recentHistory.slice(-12).forEach((item) => {
@@ -87,9 +103,9 @@ export const Forecasting = () => {
         timestamp: item.timestamp.split(' ')[1] || item.timestamp,
         actual_kwh: item.energy_kwh,
         predicted_kwh: null,
+        baseline_kwh: null,
         lower_bound: null,
         upper_bound: null,
-        is_forecast: false,
       });
     });
   }
@@ -100,9 +116,9 @@ export const Forecasting = () => {
         timestamp: item.timestamp.split(' ')[1] || item.timestamp,
         actual_kwh: null,
         predicted_kwh: item.predicted_kwh,
+        baseline_kwh: item.baseline_kwh,
         lower_bound: item.lower_bound_kwh,
         upper_bound: item.upper_bound_kwh,
-        is_forecast: true,
       });
     });
   }
@@ -112,20 +128,49 @@ export const Forecasting = () => {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Recursive Supervised Forecasting</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Explainable Multi-Step Forecasting</h1>
           <p className="text-sm text-slate-400 mt-1">
-            Multi-step time-series prediction with calibrated error propagation bands & zero lookahead target leakage.
+            Recursive multi-step forecasting with baseline comparisons, feature explainability, and calibrated error intervals.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {buildings.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111827] border border-[#1F293D] text-xs">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <select
+                value={selectedBuildingId}
+                onChange={(e) => setSelectedBuildingId(e.target.value)}
+                className="bg-transparent text-slate-200 focus:outline-none cursor-pointer"
+              >
+                <option value="" className="bg-[#111827] text-slate-200">
+                  All Facilities
+                </option>
+                {buildings.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-[#111827] text-slate-200">
+                    {b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <a
+            href="/api/reports/export-csv?export_type=forecast"
+            download
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#161F30] hover:bg-[#1E293B] border border-[#1F293D] text-xs font-medium text-slate-200 transition"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Export Forecast CSV</span>
+          </a>
+
           <button
             onClick={handleRetrain}
             disabled={retraining}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold transition shadow-lg shadow-emerald-600/20"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 text-xs font-bold transition shadow-lg shadow-emerald-600/20"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${retraining ? 'animate-spin' : ''}`} />
-            <span>{retraining ? 'Evaluating Models...' : 'Retrain Pipeline'}</span>
+            <span>{retraining ? 'Retraining...' : 'Retrain Pipeline'}</span>
           </button>
         </div>
       </div>
@@ -145,7 +190,7 @@ export const Forecasting = () => {
           <div className="flex items-center gap-1">
             {[
               { label: 'Next 1 Hour', value: 1 },
-              { label: 'Next 24 Hours (Next Day)', value: 24 },
+              { label: 'Next 24 Hours', value: 24 },
               { label: 'Next 7 Days (168h)', value: 168 },
             ].map((opt) => (
               <button
@@ -164,7 +209,7 @@ export const Forecasting = () => {
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400">Interval Confidence:</span>
+          <span className="text-slate-400">Calibrated Interval:</span>
           <select
             value={confidence}
             onChange={(e) => setConfidence(parseFloat(e.target.value))}
@@ -187,51 +232,63 @@ export const Forecasting = () => {
           {/* Summary KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
-              title="Total Predicted Energy"
+              title="Predicted Energy"
               value={forecastData.total_predicted_kwh}
               unit="kWh"
               icon={TrendingUp}
-              subtitle={`Over upcoming ${horizon} hours`}
+              color="emerald"
+              subtitle={`Upcoming ${horizon} hours`}
             />
             <MetricCard
-              title="Average Hourly Demand"
-              value={forecastData.average_predicted_kwh}
+              title="Baseline Comparison"
+              value={forecastData.total_baseline_kwh}
               unit="kWh"
-              subtitle="Expected hourly load"
+              icon={BarChart2}
+              color="amber"
+              subtitle="Historical Day/Hour Mean"
             />
             <MetricCard
-              title="Peak Forecasted Load"
+              title="Peak Forecast Load"
               value={forecastData.peak_predicted_kwh}
               unit="kWh"
-              subtitle="Highest predicted surge"
+              icon={Layers}
+              color="blue"
+              subtitle="Maximum anticipated draw"
             />
             <MetricCard
-              title="Active Model"
+              title="Active Forecaster"
               value={forecastData.model_name}
-              badge="Top Performer"
-              subtitle={`Residual \u03c3 = ${metrics?.residual_std || 0.25} kWh`}
+              unit=""
+              icon={Cpu}
+              color="purple"
+              subtitle={`Version ${forecastData.model_version} • σ = ${metrics?.residual_std || 0.25} kWh`}
             />
           </div>
 
-          {/* Main Forecast Chart with Prediction Intervals */}
-          <div className="bg-[#111827] border border-[#1F293D] rounded-xl p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          {/* Main Forecast Chart with Confidence Band & Baseline Comparison */}
+          <div className="bg-[#111827] border border-[#1F293D] rounded-2xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <h3 className="text-base font-semibold text-white">
-                  Multi-Step Forecast & Confidence Interval Band
+                <h3 className="text-sm font-semibold text-white">
+                  Trajectory: Observed Telemetry, Model Forecast, and Baseline Reference
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Recent observed history transitioning into future recursive predictions with widening error bounds
+                  Observed historical readings transitioning into multi-step recursive forecast with calibrated bounds.
                 </p>
               </div>
-              <div className="flex items-center gap-3 text-xs">
+
+              <div className="flex items-center gap-3 text-xs flex-wrap">
                 <span className="flex items-center gap-1.5 text-blue-400">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-400" />
-                  Observed History
+                  Observed (Prior 12h)
                 </span>
-                <span className="flex items-center gap-1.5 text-emerald-400">
+                <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                   Model Forecast
+                </span>
+                <span className="flex items-center gap-1.5 text-amber-400">
+                  <span className="w-2.5 h-0.5 bg-amber-400 border border-dashed" />
+                  Historical Baseline
                 </span>
                 <span className="flex items-center gap-1.5 text-slate-400">
                   <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20 border border-emerald-500/40" />
@@ -242,25 +299,18 @@ export const Forecasting = () => {
 
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={combinedChartData} margin={{ top: 10, right: 10, left: -20, bottom: 10 }}>
-                  <defs>
-                    <linearGradient id="bandGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
+                <AreaChart data={combinedChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1F293D" vertical={false} />
                   <XAxis dataKey="timestamp" stroke="#64748B" fontSize={11} tickLine={false} />
                   <YAxis stroke="#64748B" fontSize={11} tickLine={false} unit=" kWh" />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#161F30',
+                      backgroundColor: '#0B0F17',
                       borderColor: '#1F293D',
-                      borderRadius: '8px',
+                      borderRadius: '0.75rem',
                       color: '#F3F4F6',
                       fontSize: '12px',
                     }}
-                    formatter={(val, name) => [`${val ? val + ' kWh' : '—'}`, name]}
                   />
                   {/* Confidence Interval Upper and Lower Bounds */}
                   <Area
@@ -289,99 +339,77 @@ export const Forecasting = () => {
                     name="Observed Energy"
                     connectNulls={false}
                   />
-                  {/* Prediction Line */}
+                  {/* Model Prediction Line */}
                   <Line
                     type="monotone"
                     dataKey="predicted_kwh"
                     stroke="#10B981"
                     strokeWidth={2.5}
-                    strokeDasharray="5 5"
                     dot={{ r: 2, fill: '#10B981' }}
-                    name="Predicted kWh"
-                    connectNulls={false}
+                    name="Model Forecast (kWh)"
+                  />
+                  {/* Historical Average Baseline */}
+                  <Line
+                    type="monotone"
+                    dataKey="baseline_kwh"
+                    stroke="#F59E0B"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    name="Baseline Forecaster"
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Model Comparison Benchmark Table */}
-          {metrics && (
-            <div className="bg-[#111827] border border-[#1F293D] rounded-xl overflow-hidden">
-              <div className="p-4 border-b border-[#1F293D] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          {/* Explainability & Feature Importance Cards */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-200">Forecast Explainability: Top Influential Features</h3>
+                <p className="text-xs text-slate-400">
+                  Statistical permutation sensitivity measuring the weight of lags, rolling windows, and cyclical time encodings.
+                </p>
+              </div>
+              <span className="text-xs text-slate-500 font-mono">Normalized Sum: 100%</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {forecastData.top_features?.map((feat, idx) => (
+                <div key={idx} className="p-4 rounded-xl bg-[#111827] border border-[#1F293D] space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200">{feat.feature}</span>
+                    <span className="text-xs font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30">
+                      {feat.importance_pct}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                    <div className="bg-emerald-500 h-full" style={{ width: `${feat.importance_pct}%` }} />
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">{feat.interpretation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Prediction Interval Calibration Card */}
+          {forecastData.interval_calibration && (
+            <div className="p-4 rounded-xl bg-[#0B0F17] border border-[#1F293D] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-base font-semibold text-white">Algorithm Benchmark Comparison</h3>
-                  <p className="text-xs text-slate-400">
-                    Chronological validation & holdout test evaluation (Split: {metrics.train_rows} train, {metrics.val_rows} val, {metrics.test_rows} test)
-                  </p>
-                </div>
-                <div className="text-xs text-slate-400">
-                  Trained: <span className="text-slate-200 font-medium">{new Date(metrics.trained_at).toLocaleString()}</span>
+                  <span className="font-semibold text-slate-200 block">
+                    Prediction Interval Calibration Verification: Certified {forecastData.interval_calibration.empirical_coverage_pct}% Empirical Coverage
+                  </span>
+                  <span className="text-slate-400 block text-[11px] mt-0.5">
+                    Nominal {Math.round(forecastData.interval_calibration.nominal_confidence * 100)}% bounds validated against {forecastData.interval_calibration.evaluation_sample_size} held-out validation actuals.
+                  </span>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#161F30] text-slate-300 font-semibold border-b border-[#1F293D]">
-                    <tr>
-                      <th className="py-3 px-4">Model Candidate</th>
-                      <th className="py-3 px-4">Algorithm Type</th>
-                      <th className="py-3 px-4 text-right">Val MAE</th>
-                      <th className="py-3 px-4 text-right">Val RMSE</th>
-                      <th className="py-3 px-4 text-right">Val R²</th>
-                      <th className="py-3 px-4 text-right">Test MAE</th>
-                      <th className="py-3 px-4 text-right">Test RMSE</th>
-                      <th className="py-3 px-4 text-right">Test R²</th>
-                      <th className="py-3 px-4 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#1F293D] text-slate-300">
-                    {[
-                      { key: 'baseline', name: 'Historical Baseline', type: 'Day-of-Week / Hour Average' },
-                      { key: 'linear_regression', name: 'Linear Regression', type: 'Standardized Linear Model' },
-                      { key: 'random_forest', name: 'Random Forest', type: 'Ensemble Decision Trees' },
-                      { key: 'hist_gradient_boosting', name: 'HistGradientBoosting', type: 'Histogram Boosted Trees' },
-                    ].map((m) => {
-                      const valScore = metrics.validation_metrics[m.key] || {};
-                      const testScore = metrics.test_metrics[m.key] || {};
-                      const isSelected = metrics.best_model_name === m.key;
-
-                      return (
-                        <tr key={m.key} className={`hover:bg-slate-800/40 transition ${isSelected ? 'bg-emerald-500/5' : ''}`}>
-                          <td className="py-3 px-4 font-semibold text-white flex items-center gap-2">
-                            <span>{m.name}</span>
-                            {isSelected && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                ACTIVE
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-slate-400">{m.type}</td>
-                          <td className="py-3 px-4 text-right font-medium text-emerald-400">{valScore.mae?.toFixed(4) || '—'}</td>
-                          <td className="py-3 px-4 text-right">{valScore.rmse?.toFixed(4) || '—'}</td>
-                          <td className="py-3 px-4 text-right font-medium">{valScore.r2?.toFixed(4) || '—'}</td>
-                          <td className="py-3 px-4 text-right text-slate-300 font-medium">{testScore.mae?.toFixed(4) || '—'}</td>
-                          <td className="py-3 px-4 text-right text-slate-400">{testScore.rmse?.toFixed(4) || '—'}</td>
-                          <td className="py-3 px-4 text-right text-slate-300">{testScore.r2?.toFixed(4) || '—'}</td>
-                          <td className="py-3 px-4 text-center">
-                            {isSelected ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold text-[11px]">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Best Val MAE
-                              </span>
-                            ) : (
-                              <span className="text-slate-500 text-[11px]">Evaluated</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="p-3 bg-[#161F30]/50 border-t border-[#1F293D] text-[11px] text-slate-400 flex items-center gap-2">
-                <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Production model selection is determined strictly by minimum validation MAE on non-shuffled temporal holdouts.</span>
+              <div className="text-[11px] text-slate-500 italic max-w-sm sm:text-right">
+                {forecastData.explainability_disclaimer}
               </div>
             </div>
           )}
@@ -390,3 +418,5 @@ export const Forecasting = () => {
     </div>
   );
 };
+
+export default Forecasting;

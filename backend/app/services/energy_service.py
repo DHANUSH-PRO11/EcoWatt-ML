@@ -19,9 +19,15 @@ def get_energy_history(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
     limit: int = 500,
+    building_id: Optional[int] = None,
+    meter_id: Optional[int] = None,
 ) -> EnergyHistoryResponse:
     query = db.query(EnergyReading)
 
+    if building_id:
+        query = query.filter(EnergyReading.building_id == building_id)
+    if meter_id:
+        query = query.filter(EnergyReading.meter_id == meter_id)
     if start_time:
         query = query.filter(EnergyReading.timestamp >= start_time)
     if end_time:
@@ -82,9 +88,15 @@ def get_energy_analytics(
     aggregation: str = "daily",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    building_id: Optional[int] = None,
+    meter_id: Optional[int] = None,
 ) -> EnergyAnalyticsResponse:
     query = db.query(EnergyReading)
 
+    if building_id:
+        query = query.filter(EnergyReading.building_id == building_id)
+    if meter_id:
+        query = query.filter(EnergyReading.meter_id == meter_id)
     if start_date:
         query = query.filter(EnergyReading.timestamp >= pd.to_datetime(start_date))
     if end_date:

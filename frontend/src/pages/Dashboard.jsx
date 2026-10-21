@@ -24,22 +24,31 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { getDashboardSummary, acknowledgeAnomaly } from '../api/client';
+import { getDashboardSummary, acknowledgeAnomaly, getBuildings } from '../api/client';
 import { MetricCard } from '../components/MetricCard';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { SeverityBadge, StatusBadge } from '../components/StatusBadge';
+import { Building2, Download } from 'lucide-react';
 
 export const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [buildings, setBuildings] = useState([]);
+  const [selectedBuildingId, setSelectedBuildingId] = useState('');
+
+  useEffect(() => {
+    getBuildings()
+      .then((blds) => setBuildings(blds))
+      .catch(() => {});
+  }, []);
 
   const fetchSummary = async () => {
     try {
       setLoading(true);
       setError(null);
-      const summary = await getDashboardSummary();
+      const summary = await getDashboardSummary(selectedBuildingId || null);
       setData(summary);
     } catch (err) {
       setError(err.message || 'Failed to load dashboard metrics');
@@ -50,7 +59,7 @@ export const Dashboard = () => {
 
   useEffect(() => {
     fetchSummary();
-  }, []);
+  }, [selectedBuildingId]);
 
   const handleAcknowledge = async (id) => {
     try {
@@ -117,20 +126,51 @@ export const Dashboard = () => {
             Last reading: {last_updated} &bull; Source: {data_source}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {buildings.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#111827] border border-[#1F293D] text-xs">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <select
+                value={selectedBuildingId}
+                onChange={(e) => setSelectedBuildingId(e.target.value)}
+                className="bg-transparent text-slate-200 focus:outline-none cursor-pointer"
+              >
+                <option value="" className="bg-[#111827] text-slate-200">
+                  All Facilities (Portfolio)
+                </option>
+                {buildings.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-[#111827] text-slate-200">
+                    {b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <a
+            href={`/api/reports/summary${selectedBuildingId ? `?building_id=${selectedBuildingId}` : ''}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#111827] hover:bg-[#161F30] border border-[#1F293D] text-xs font-medium text-slate-300 hover:text-white transition"
+            title="Download executive intelligence report"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-400" />
+            <span>Executive Report</span>
+          </a>
+
           <Link
             to="/forecasting"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#161F30] hover:bg-[#1E293B] border border-[#1F293D] text-sm font-medium text-slate-200 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#161F30] hover:bg-[#1E293B] border border-[#1F293D] text-xs font-medium text-slate-200 transition"
           >
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <span>Generate Forecast</span>
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Forecast</span>
           </Link>
           <Link
             to="/billing"
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium transition shadow-lg shadow-emerald-600/20"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-xs font-bold transition shadow-lg shadow-emerald-600/20"
           >
-            <Receipt className="w-4 h-4" />
-            <span>Simulate Bill</span>
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Budget & Bills</span>
           </Link>
         </div>
       </div>

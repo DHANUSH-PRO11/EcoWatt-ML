@@ -15,11 +15,14 @@ from backend.app.services.forecast_service import generate_forecast
 from backend.app.schemas.forecast import ForecastRequest
 
 
-def get_dashboard_summary(db: Session) -> DashboardSummaryResponse:
+def get_dashboard_summary(db: Session, building_id: Optional[int] = None) -> DashboardSummaryResponse:
     # 1. Fetch latest readings
+    query = db.query(EnergyReading)
+    if building_id:
+        query = query.filter(EnergyReading.building_id == building_id)
+
     latest_readings = (
-        db.query(EnergyReading)
-        .order_by(EnergyReading.timestamp.desc())
+        query.order_by(EnergyReading.timestamp.desc())
         .limit(1440)  # Up to 60 days of hourly readings
         .all()
     )
@@ -114,13 +117,17 @@ def get_dashboard_summary(db: Session) -> DashboardSummaryResponse:
         predicted_next_day_kwh = round(today_kwh if today_kwh > 0 else yesterday_kwh, 2)
 
     # Anomalies
+    anom_query = db.query(AnomalyAlert)
+    if building_id:
+        anom_query = anom_query.filter(AnomalyAlert.building_id == building_id)
+
     active_anomalies_count = (
-        db.query(AnomalyAlert)
+        anom_query
         .filter(AnomalyAlert.status.in_(["new", "acknowledged"]))
         .count()
     )
     recent_anom_records = (
-        db.query(AnomalyAlert)
+        anom_query
         .order_by(AnomalyAlert.timestamp.desc())
         .limit(5)
         .all()

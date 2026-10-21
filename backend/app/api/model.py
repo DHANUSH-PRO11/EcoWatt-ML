@@ -1,12 +1,17 @@
 import json
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from backend.app.database import get_db
 from backend.app.schemas.metadata import ModelMetricsResponse
 from backend.app.models.metadata import ModelEvaluationMeta
 from ml.config import METRICS_FILE
-from ml.train import train_and_evaluate_models
+from backend.app.services.model_health_service import (
+    get_model_health_status,
+    execute_safe_retraining,
+    list_training_records,
+)
 
 router = APIRouter(prefix="/api/model", tags=["Model & ML Ops"])
 
@@ -25,47 +30,54 @@ def get_model_metrics(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to read model metrics: {str(e)}")
 
 
+@router.get("/health")
+def get_health_and_drift(db: Session = Depends(get_db)):
+    """Evaluate rolling MAE/RMSE, distribution shift, and drift classification (Healthy, Warning, Drift Detected)."""
+    try:
+        return get_model_health_status(db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to evaluate model health: {str(e)}")
+
+
+@router.get("/history")
+def get_training_history(limit: int = Query(15, ge=1, le=100), db: Session = Depends(get_db)):
+    """Retrieve persistent training logs with candidates, metrics, errors, and promotion decisions."""
+    try:
+        return list_training_records(db, limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve training history: {str(e)}")
+
+
+@router.post("/train-safe")
+def retrain_model_safely(
+    force_sample: bool = False,
+    initiated_by: str = Query("user_manual", description="User or automated trigger initiating retraining"),
+    db: Session = Depends(get_db),
+):
+    """
+    Execute protected model retraining:
+    Trains all candidate models, evaluates validation metrics against the previous baseline,
+    promotes the new model only if criteria pass, and rolls back gracefully on degradation or failure.
+    """
+    try:
+        result = execute_safe_retraining(db, force_sample=force_sample, initiated_by=initiated_by)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Protected retraining failed: {str(e)}")
+
+
 @router.post("/train")
 def retrain_model_pipeline(
     force_sample: bool = False,
     db: Session = Depends(get_db),
 ):
-    """
-    Trigger reproducible retraining and evaluation of all candidate forecasting models:
-    Baseline, Linear Regression, Random Forest, and HistGradientBoostingRegressor.
-    Chronologically splits data, evaluates validation & test sets, and saves the top-performing artifact.
-    """
+    """Trigger retraining of forecasting models with atomic database metadata updates."""
     try:
-        metrics_data = train_and_evaluate_models(force_generate_sample=force_sample)
-
-        # Update database metadata record
-        db.query(ModelEvaluationMeta).update({ModelEvaluationMeta.is_active: False})
-        best_name = metrics_data["best_model_name"]
-        best_val = metrics_data["validation_metrics"][best_name]
-        best_test = metrics_data["test_metrics"][best_name]
-
-        meta_record = ModelEvaluationMeta(
-            trained_at=datetime.fromisoformat(metrics_data["trained_at"].replace("Z", "+00:00")),
-            best_model_name=best_name,
-            dataset_rows=metrics_data["dataset_rows"],
-            val_mae=best_val["mae"],
-            val_rmse=best_val["rmse"],
-            val_r2=best_val["r2"],
-            test_mae=best_test["mae"],
-            test_rmse=best_test["rmse"],
-            test_r2=best_test["r2"],
-            residual_std=metrics_data["residual_std"],
-            all_metrics_json=json.dumps(metrics_data),
-            is_active=True,
-        )
-        db.add(meta_record)
-        db.commit()
-
+        result = execute_safe_retraining(db, force_sample=force_sample, initiated_by="user_pipeline")
         return {
-            "status": "success",
-            "message": f"Successfully trained and evaluated models. Best model: '{best_name}'.",
-            "metrics": metrics_data,
+            "status": "success" if result["promoted"] else "warning",
+            "message": result["message"],
+            "metrics": result.get("metrics"),
         }
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=f"Model retraining failed: {str(e)}")

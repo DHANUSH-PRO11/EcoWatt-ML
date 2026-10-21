@@ -11,6 +11,16 @@ from backend.app.api.bills import router as bills_router
 from backend.app.api.insights import router as insights_router
 from backend.app.api.model import router as model_router
 from backend.app.api.settings import router as settings_router
+from backend.app.api.buildings import router as buildings_router
+from backend.app.api.advanced_analytics import router as advanced_analytics_router
+from backend.app.api.import_data import router as import_router
+from backend.app.api.budget import router as budget_router
+from backend.app.api.simulator import router as simulator_router
+from backend.app.api.carbon import router as carbon_router
+from backend.app.api.circuits import router as circuits_router
+from backend.app.api.notifications import router as notifications_router
+from backend.app.api.reports import router as reports_router
+from backend.app.api.audit import router as audit_router
 
 from contextlib import asynccontextmanager
 
@@ -26,8 +36,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Smart Household Electricity Consumption Prediction & Anomaly Analytics Platform",
-    version="1.0.0",
+    description="EcoWatt ML — Advanced Household & Institutional Energy Intelligence Platform",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -42,7 +52,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API Routers
+# Register Core & Feature Routers
 app.include_router(health_router)
 app.include_router(dashboard_router)
 app.include_router(energy_router)
@@ -52,6 +62,16 @@ app.include_router(bills_router)
 app.include_router(insights_router)
 app.include_router(model_router)
 app.include_router(settings_router)
+app.include_router(buildings_router)
+app.include_router(advanced_analytics_router)
+app.include_router(import_router)
+app.include_router(budget_router)
+app.include_router(simulator_router)
+app.include_router(carbon_router)
+app.include_router(circuits_router)
+app.include_router(notifications_router)
+app.include_router(reports_router)
+app.include_router(audit_router)
 
 
 from pathlib import Path
@@ -76,8 +96,8 @@ else:
     @app.get("/", tags=["Root"])
     def root():
         return {
-            "message": f"Welcome to {settings.APP_NAME} API",
-            "version": "1.0.0",
+            "message": f"Welcome to {settings.APP_NAME} API v2.0",
+            "version": "2.0.0",
             "documentation": "/docs",
             "health": "/api/health",
         }

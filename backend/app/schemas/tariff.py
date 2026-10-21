@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class TariffSlab(BaseModel):
@@ -34,6 +34,4 @@ class TariffSettingResponse(TariffSettingBase):
     id: int
     is_active: bool
     updated_at: str
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor, HistGradientBoostingRegressor
