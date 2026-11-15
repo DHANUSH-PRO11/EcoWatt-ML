@@ -8,6 +8,7 @@ class EnergyMeterBase(BaseModel):
     name: str = Field(..., json_schema_extra={"example": "Main Incomer Grid Meter"})
     meter_type: str = Field(default="main", json_schema_extra={"example": "main"})
     status: str = Field(default="active", json_schema_extra={"example": "active"})
+    max_power_kw: Optional[float] = Field(default=None, json_schema_extra={"example": 15.0})
 
 
 class EnergyMeterCreate(EnergyMeterBase):
@@ -29,6 +30,7 @@ class BuildingBase(BaseModel):
     location: str = Field(default="Primary Site", json_schema_extra={"example": "Primary Site"})
     description: Optional[str] = Field(default=None, json_schema_extra={"example": "Main building"})
     floor_area_sqm: Optional[float] = Field(default=None, json_schema_extra={"example": 185.0})
+    max_power_kw: Optional[float] = Field(default=None, json_schema_extra={"example": 15.0})
 
 
 class BuildingCreate(BuildingBase):
@@ -41,6 +43,7 @@ class BuildingUpdate(BaseModel):
     location: Optional[str] = None
     description: Optional[str] = None
     floor_area_sqm: Optional[float] = None
+    max_power_kw: Optional[float] = None
     is_active: Optional[bool] = None
 
 

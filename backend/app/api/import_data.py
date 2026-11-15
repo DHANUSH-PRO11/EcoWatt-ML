@@ -48,8 +48,14 @@ async def validate_file(
     sub2_col: Optional[str] = Form(None),
     sub3_col: Optional[str] = Form(None),
     separator: str = Form(","),
+    unit: str = Form("kWh"),
+    max_power_threshold: Optional[float] = Form(None),
+    building_id: Optional[int] = Form(None),
+    meter_id: Optional[int] = Form(None),
+    building_type: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
 ):
-    """Validate uploaded CSV against column mappings and identify invalid or non-physical rows."""
+    """Validate uploaded CSV against column mappings and identify invalid or non-physical rows with configurable threshold."""
     content = await file.read()
     try:
         result = validate_csv_dataset(
@@ -60,6 +66,12 @@ async def validate_file(
             sub2_col=sub2_col,
             sub3_col=sub3_col,
             separator=separator,
+            unit=unit,
+            max_power_threshold=max_power_threshold,
+            building_id=building_id,
+            meter_id=meter_id,
+            building_type=building_type,
+            db=db,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])

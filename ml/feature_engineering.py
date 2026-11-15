@@ -47,6 +47,12 @@ def create_calendar_features(df: pd.DataFrame, dt_col: str = DATETIME_COL) -> pd
     df["sin_month"] = np.sin(2 * np.pi * (df["month"] - 1) / 12.0)
     df["cos_month"] = np.cos(2 * np.pi * (df["month"] - 1) / 12.0)
 
+    # Standard feature aliases
+    df["hour_sin"] = df["sin_hour"]
+    df["hour_cos"] = df["cos_hour"]
+    df["day_sin"] = df["sin_day_of_week"]
+    df["day_cos"] = df["cos_day_of_week"]
+
     return df
 
 
@@ -106,6 +112,7 @@ def prepare_single_step_features(
     target_dt: pd.Timestamp,
     target_col: str = TARGET_COL,
     dt_col: str = DATETIME_COL,
+    feature_columns: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """
     Constructs feature row for a future timestamp using only the known history up to target_dt - 1 hour.
@@ -157,6 +164,10 @@ def prepare_single_step_features(
         "cos_day_of_week": cos_day_of_week,
         "sin_month": sin_month,
         "cos_month": cos_month,
+        "hour_sin": sin_hour,
+        "hour_cos": cos_hour,
+        "day_sin": sin_day_of_week,
+        "day_cos": cos_day_of_week,
         "lag_1": lag_1,
         "lag_2": lag_2,
         "lag_3": lag_3,
@@ -168,4 +179,5 @@ def prepare_single_step_features(
         "rolling_std_24": rolling_std_24,
     }
 
-    return pd.DataFrame([features])[FEATURE_COLUMNS]
+    cols = feature_columns or FEATURE_COLUMNS
+    return pd.DataFrame([features])[cols]

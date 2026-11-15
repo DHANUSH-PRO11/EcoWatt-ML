@@ -1,12 +1,24 @@
 {
-  "trained_at": "2026-10-21T07:35:14.830754Z",
+  "model_version": "2.0.0",
+  "trained_at": "2026-11-15T16:34:43.245648+00:00",
   "dataset_rows": 4321,
   "train_rows": 2907,
   "val_rows": 623,
   "test_rows": 623,
   "is_simulated": true,
   "best_model_name": "baseline",
-  "residual_std": 0.8599,
+  "residual_std": 0.8312,
+  "residual_distribution": {
+    "mean": 0.2257,
+    "std": 0.8312,
+    "p25": -0.0429,
+    "p50": 0.0894,
+    "p75": 0.2514,
+    "min": -0.9352,
+    "max": 6.3568,
+    "coverage_90_pct": 96.95,
+    "coverage_95_pct": 96.95
+  },
   "feature_columns": [
     "hour",
     "day_of_week",
@@ -29,58 +41,208 @@
     "rolling_mean_24",
     "rolling_std_24"
   ],
+  "feature_importances": [
+    {
+      "feature": "hour",
+      "importance_score": 0.3802,
+      "importance_pct": 86.93,
+      "category": "calendar_cyclical",
+      "interpretation": "Statistical sensitivity driver 'hour' affecting electricity demand predictions."
+    },
+    {
+      "feature": "day_of_week",
+      "importance_score": 0.0572,
+      "importance_pct": 13.07,
+      "category": "calendar_cyclical",
+      "interpretation": "Statistical sensitivity driver 'day_of_week' affecting electricity demand predictions."
+    },
+    {
+      "feature": "day_of_month",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Statistical sensitivity driver 'day_of_month' affecting electricity demand predictions."
+    },
+    {
+      "feature": "month",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Statistical sensitivity driver 'month' affecting electricity demand predictions."
+    },
+    {
+      "feature": "is_weekend",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Accounts for weekend occupancy shifts, delayed waking hours, and daytime usage patterns."
+    },
+    {
+      "feature": "sin_hour",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Diurnal circadian harmonic capturing morning routine, midday plateau, and evening peak demand."
+    },
+    {
+      "feature": "cos_hour",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Diurnal cyclical harmonic capturing night baseload vs active daytime transitions."
+    },
+    {
+      "feature": "sin_day_of_week",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Weekly harmonic capturing weekday versus weekend load variations."
+    },
+    {
+      "feature": "cos_day_of_week",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Weekly cyclic profile capturing mid-week production and weekend drop-offs."
+    },
+    {
+      "feature": "sin_month",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Statistical sensitivity driver 'sin_month' affecting electricity demand predictions."
+    },
+    {
+      "feature": "cos_month",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "calendar_cyclical",
+      "interpretation": "Statistical sensitivity driver 'cos_month' affecting electricity demand predictions."
+    },
+    {
+      "feature": "lag_1",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "lagged_consumption",
+      "interpretation": "Highest short-term autocorrelation; persistent active appliance states directly influence next-hour draw."
+    },
+    {
+      "feature": "lag_2",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "lagged_consumption",
+      "interpretation": "Statistical sensitivity driver 'lag_2' affecting electricity demand predictions."
+    },
+    {
+      "feature": "lag_3",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "lagged_consumption",
+      "interpretation": "Statistical sensitivity driver 'lag_3' affecting electricity demand predictions."
+    },
+    {
+      "feature": "lag_24",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "lagged_consumption",
+      "interpretation": "Captures 24-hour periodicity in daily occupancy schedule and appliance timing."
+    },
+    {
+      "feature": "lag_48",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "lagged_consumption",
+      "interpretation": "Statistical sensitivity driver 'lag_48' affecting electricity demand predictions."
+    },
+    {
+      "feature": "lag_168",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "lagged_consumption",
+      "interpretation": "Weekly lag capturing recurring 7-day cyclical operational schedules."
+    },
+    {
+      "feature": "rolling_mean_6",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "rolling_window",
+      "interpretation": "Short-term trend capturing recent multi-hour appliance usage blocks."
+    },
+    {
+      "feature": "rolling_mean_24",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "rolling_window",
+      "interpretation": "Captures prevailing diurnal baseload level and background refrigeration/HVAC operating baseline."
+    },
+    {
+      "feature": "rolling_std_24",
+      "importance_score": 0.0,
+      "importance_pct": 0.0,
+      "category": "rolling_window",
+      "interpretation": "Quantifies consumption volatility and distinguishes steady baseload from switching bursts."
+    }
+  ],
+  "model_config": {
+    "model_type": "baseline",
+    "random_state": 42,
+    "train_ratio": 0.7,
+    "val_ratio": 0.15,
+    "test_ratio": 0.15,
+    "hyperparameters": {}
+  },
   "validation_metrics": {
     "baseline": {
-      "mae": 0.3018,
-      "rmse": 0.8677,
-      "r2": 0.206
+      "mae": 0.3328,
+      "rmse": 0.8613,
+      "r2": 0.2235
     },
     "linear_regression": {
-      "mae": 0.3879,
-      "rmse": 0.8878,
-      "r2": 0.1689
+      "mae": 0.5043,
+      "rmse": 0.8867,
+      "r2": 0.1771
     },
     "random_forest": {
-      "mae": 0.3182,
-      "rmse": 0.8622,
-      "r2": 0.216
+      "mae": 0.334,
+      "rmse": 0.8399,
+      "r2": 0.2616
     },
     "hist_gradient_boosting": {
-      "mae": 0.3321,
-      "rmse": 0.8755,
-      "r2": 0.1917
+      "mae": 0.3929,
+      "rmse": 0.872,
+      "r2": 0.2041
     }
   },
   "test_metrics": {
     "baseline": {
-      "mae": 0.3282,
-      "rmse": 0.8349,
-      "r2": 0.2671
+      "mae": 0.3863,
+      "rmse": 0.8584,
+      "r2": 0.2526
     },
     "linear_regression": {
-      "mae": 0.4029,
-      "rmse": 0.8673,
-      "r2": 0.209
+      "mae": 0.7042,
+      "rmse": 0.965,
+      "r2": 0.0556
     },
     "random_forest": {
-      "mae": 0.3163,
-      "rmse": 0.8156,
-      "r2": 0.3005
+      "mae": 0.328,
+      "rmse": 0.798,
+      "r2": 0.3542
     },
     "hist_gradient_boosting": {
-      "mae": 0.3549,
-      "rmse": 0.8298,
-      "r2": 0.2759
+      "mae": 0.3872,
+      "rmse": 0.853,
+      "r2": 0.2621
     }
   },
   "best_model_validation": {
-    "mae": 0.3018,
-    "rmse": 0.8677,
-    "r2": 0.206
+    "mae": 0.3328,
+    "rmse": 0.8613,
+    "r2": 0.2235
   },
   "best_model_test": {
-    "mae": 0.3282,
-    "rmse": 0.8349,
-    "r2": 0.2671
+    "mae": 0.3863,
+    "rmse": 0.8584,
+    "r2": 0.2526
   }
 }

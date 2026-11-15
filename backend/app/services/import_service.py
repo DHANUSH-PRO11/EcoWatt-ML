@@ -9,6 +9,57 @@ from backend.app.models.energy import EnergyReading
 from backend.app.models.metadata import DataImportMeta
 from backend.app.models.audit import AuditLog
 from backend.app.models.notification import Notification
+from backend.app.models.building import Building, EnergyMeter
+
+DEFAULT_MAX_POWER_BY_TYPE = {
+    "household": 15.0,
+    "classroom": 50.0,
+    "office": 100.0,
+    "laboratory": 250.0,
+    "commercial": 1000.0,
+}
+
+
+def resolve_max_power_threshold(
+    db: Optional[Session] = None,
+    building_id: Optional[int] = None,
+    meter_id: Optional[int] = None,
+    building_type: Optional[str] = None,
+    custom_max_power_threshold: Optional[float] = None,
+) -> float:
+    """
+    Resolves the effective maximum power threshold:
+    1. Explicit custom threshold takes precedence.
+    2. Specific meter threshold if configured on the meter.
+    3. Specific building threshold if configured on the building.
+    4. Building-type standard threshold (e.g. household: 15 kW, commercial: 1000 kW).
+    5. Fallback safe threshold (1000.0 kW).
+    """
+    if custom_max_power_threshold is not None and custom_max_power_threshold > 0:
+        return float(custom_max_power_threshold)
+
+    if db is not None and meter_id is not None:
+        meter = db.query(EnergyMeter).filter(EnergyMeter.id == meter_id).first()
+        if meter:
+            if meter.max_power_kw is not None and meter.max_power_kw > 0:
+                return float(meter.max_power_kw)
+            if meter.building_id and building_id is None:
+                building_id = meter.building_id
+
+    if db is not None and building_id is not None:
+        bld = db.query(Building).filter(Building.id == building_id).first()
+        if bld:
+            if bld.max_power_kw is not None and bld.max_power_kw > 0:
+                return float(bld.max_power_kw)
+            if bld.building_type:
+                building_type = bld.building_type
+
+    if building_type:
+        btype = building_type.lower()
+        if btype in DEFAULT_MAX_POWER_BY_TYPE:
+            return DEFAULT_MAX_POWER_BY_TYPE[btype]
+
+    return 1000.0
 
 
 def preview_csv(file_bytes: bytes, max_preview: int = 10) -> Dict[str, Any]:
@@ -44,11 +95,20 @@ def validate_csv_dataset(
     sub2_col: Optional[str] = None,
     sub3_col: Optional[str] = None,
     separator: str = ",",
+    unit: str = "kWh",
+    max_power_threshold: Optional[float] = None,
+    building_id: Optional[int] = None,
+    meter_id: Optional[int] = None,
+    building_type: Optional[str] = None,
+    db: Optional[Session] = None,
 ) -> Dict[str, Any]:
     """
     Validates CSV content:
     - Parses timestamps and checks for parsing errors
-    - Checks for negative or extreme non-physical values (> 100 kWh/hr for residential/commercial)
+    - Checks for negative or extreme non-physical values against configurable threshold
+    - Configurable maximum power threshold per meter or building type (e.g., 15 kW for household, higher for commercial)
+    - Verifies chronological ordering and missing values
+    - Handles unit conversions (kWh vs Wh/kW/W)
     - Records rejected rows with precise reasons
     - Computes summary statistics for valid rows
     """
@@ -63,7 +123,28 @@ def validate_csv_dataset(
     if energy_col not in df.columns:
         return {"error": f"Energy/Power column '{energy_col}' not found in uploaded file."}
 
+    # Resolve effective spike cutoff threshold for this meter/building
+    effective_threshold = resolve_max_power_threshold(
+        db=db,
+        building_id=building_id,
+        meter_id=meter_id,
+        building_type=building_type,
+        custom_max_power_threshold=max_power_threshold,
+    )
+
+    unit_factor = 0.001 if unit.strip().lower() in ["wh", "w"] else 1.0
+
     seen_timestamps = set()
+    timestamps_list = []
+    missing_value_counts = {
+        "timestamp_missing": int(df[timestamp_col].isna().sum()),
+        "energy_missing": int(df[energy_col].isna().sum()),
+        "sub_missing": 0,
+    }
+
+    for col in [sub1_col, sub2_col, sub3_col]:
+        if col and col in df.columns:
+            missing_value_counts["sub_missing"] += int(df[col].isna().sum())
 
     for idx, row in df.iterrows():
         row_num = idx + 1
@@ -84,6 +165,7 @@ def validate_csv_dataset(
             rejected_rows.append({"row": row_num, "reason": f"Duplicate timestamp '{ts_str}' in file"})
             continue
         seen_timestamps.add(ts_str)
+        timestamps_list.append(ts)
 
         # 2. Validate energy value
         raw_energy = row[energy_col]
@@ -92,11 +174,19 @@ def validate_csv_dataset(
             if pd.isna(energy_val):
                 rejected_rows.append({"row": row_num, "reason": "Null or empty energy reading"})
                 continue
+            # Apply unit scaling if submitted in Wh
+            energy_val = energy_val * unit_factor
+
             if energy_val < 0.0:
-                rejected_rows.append({"row": row_num, "reason": f"Negative energy value ({energy_val})"})
+                rejected_rows.append({"row": row_num, "reason": f"Negative energy value ({energy_val:.4f} kWh)"})
                 continue
-            if energy_val > 200.0:
-                rejected_rows.append({"row": row_num, "reason": f"Unrealistic spike above 200 kWh ({energy_val})"})
+            if energy_val > effective_threshold:
+                rejected_rows.append(
+                    {
+                        "row": row_num,
+                        "reason": f"Unrealistic spike ({energy_val:.2f} kWh) exceeding configured threshold of {effective_threshold:.1f} kW for this facility",
+                    }
+                )
                 continue
         except Exception:
             rejected_rows.append({"row": row_num, "reason": f"Non-numeric energy reading: '{raw_energy}'"})
@@ -106,7 +196,7 @@ def validate_csv_dataset(
         def parse_sub(col_name):
             if col_name and col_name in df.columns:
                 try:
-                    val = float(row[col_name])
+                    val = float(row[col_name]) * unit_factor
                     return max(0.0, val) if not pd.isna(val) else 0.0
                 except Exception:
                     return 0.0
@@ -128,6 +218,13 @@ def validate_csv_dataset(
             }
         )
 
+    # 3. Check chronological ordering
+    is_chronological = True
+    if len(timestamps_list) > 1:
+        is_chronological = all(timestamps_list[i] <= timestamps_list[i + 1] for i in range(len(timestamps_list) - 1))
+        if not is_chronological:
+            valid_rows.sort(key=lambda x: x["timestamp"])
+
     valid_count = len(valid_rows)
     invalid_count = len(rejected_rows)
 
@@ -139,6 +236,10 @@ def validate_csv_dataset(
         "total_rows": total_rows,
         "valid_count": valid_count,
         "invalid_count": invalid_count,
+        "is_chronological": is_chronological,
+        "effective_threshold_kw": effective_threshold,
+        "unit_detected": unit,
+        "missing_values_report": missing_value_counts,
         "start_date": start_date,
         "end_date": end_date,
         "total_kwh": round(total_kwh, 2),

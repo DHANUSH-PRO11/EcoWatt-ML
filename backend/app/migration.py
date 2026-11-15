@@ -60,6 +60,16 @@ def run_safe_migrations():
         if forecast_cols and "confidence_level" not in forecast_cols:
             conn.execute(text("ALTER TABLE forecast_records ADD COLUMN confidence_level FLOAT DEFAULT 0.95;"))
 
+        # Check buildings
+        bld_cols = get_existing_columns(conn, "buildings")
+        if bld_cols and "max_power_kw" not in bld_cols:
+            conn.execute(text("ALTER TABLE buildings ADD COLUMN max_power_kw FLOAT;"))
+
+        # Check energy_meters
+        meter_cols = get_existing_columns(conn, "energy_meters")
+        if meter_cols and "max_power_kw" not in meter_cols:
+            conn.execute(text("ALTER TABLE energy_meters ADD COLUMN max_power_kw FLOAT;"))
+
     # 3. Seed default buildings & meters and backfill unassigned readings
     db: Session = SessionLocal()
     try:

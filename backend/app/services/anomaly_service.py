@@ -225,19 +225,28 @@ def investigate_anomaly(db: Session, alert_id: int) -> Optional[AnomalyInvestiga
         if mtr:
             meter_code = mtr.meter_code
 
-    # Fetch surrounding +/- 24 hours of readings
+    # Fetch surrounding +/- 24 hours of readings scoped to the building
     start_window = alert.timestamp - timedelta(hours=24)
     end_window = alert.timestamp + timedelta(hours=24)
 
-    surrounding = (
-        db.query(EnergyReading)
-        .filter(
-            EnergyReading.timestamp >= start_window,
-            EnergyReading.timestamp <= end_window,
-        )
-        .order_by(EnergyReading.timestamp.asc())
-        .all()
+    surr_query = db.query(EnergyReading).filter(
+        EnergyReading.timestamp >= start_window,
+        EnergyReading.timestamp <= end_window,
     )
+    if alert.building_id:
+        surr_query = surr_query.filter(EnergyReading.building_id == alert.building_id)
+    surrounding = surr_query.order_by(EnergyReading.timestamp.asc()).all()
+    if not surrounding:
+        # Fallback to general readings if building-specific readings are unpopulated
+        surrounding = (
+            db.query(EnergyReading)
+            .filter(
+                EnergyReading.timestamp >= start_window,
+                EnergyReading.timestamp <= end_window,
+            )
+            .order_by(EnergyReading.timestamp.asc())
+            .all()
+        )
 
     points = []
     for r in surrounding:
@@ -250,16 +259,29 @@ def investigate_anomaly(db: Session, alert_id: int) -> Optional[AnomalyInvestiga
             )
         )
 
-    # Compute historical typical consumption for the same weekday and hour
+    # Compute historical typical consumption for the same weekday and hour in this facility
     event_dow = alert.timestamp.weekday()
     event_hour = alert.timestamp.hour
 
-    all_readings = db.query(EnergyReading.timestamp, EnergyReading.energy_kwh).all()
+    bld_readings_query = db.query(EnergyReading.timestamp, EnergyReading.energy_kwh)
+    if alert.building_id:
+        bld_readings_query = bld_readings_query.filter(EnergyReading.building_id == alert.building_id)
+    facility_readings = bld_readings_query.all()
+
     matching_values = [
         r[1]
-        for r in all_readings
+        for r in facility_readings
         if r[0].weekday() == event_dow and r[0].hour == event_hour
     ]
+
+    # If facility has insufficient historical records, fall back across portfolio
+    if not matching_values:
+        all_readings = db.query(EnergyReading.timestamp, EnergyReading.energy_kwh).all()
+        matching_values = [
+            r[1]
+            for r in all_readings
+            if r[0].weekday() == event_dow and r[0].hour == event_hour
+        ]
 
     typical_mean = float(np.mean(matching_values)) if matching_values else alert.baseline_kwh
     typical_std = float(np.std(matching_values)) if len(matching_values) > 1 else 0.15

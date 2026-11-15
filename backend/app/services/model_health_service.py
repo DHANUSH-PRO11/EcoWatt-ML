@@ -193,18 +193,20 @@ def execute_safe_retraining(
     db.commit()
     db.refresh(training_record)
 
-    # 1. Create backups of current model files
+    # 1. Prepare candidate and backup paths
     backup_model_file = MODEL_DIR / "best_forecaster.joblib.bak"
     backup_metrics_file = MODEL_DIR / "evaluation_metrics.json.bak"
-
-    if BEST_MODEL_FILE.exists():
-        shutil.copy2(BEST_MODEL_FILE, backup_model_file)
-    if METRICS_FILE.exists():
-        shutil.copy2(METRICS_FILE, backup_metrics_file)
+    candidate_model_file = MODEL_DIR / "candidate_forecaster.joblib"
+    candidate_metrics_file = MODEL_DIR / "candidate_metrics.json"
 
     try:
-        # 2. Execute training pipeline
-        metrics = train_and_evaluate_models(force_generate_sample=force_sample)
+        # 2. Execute training tournament separately on candidate files (never interrupting live inference)
+        metrics = train_and_evaluate_models(
+            force_generate_sample=force_sample,
+            save_as_candidate=True,
+            candidate_model_file=candidate_model_file,
+            candidate_metrics_file=candidate_metrics_file,
+        )
 
         # 3. Validation acceptance check
         new_val_mae = metrics["best_model_validation"]["mae"]
@@ -216,11 +218,17 @@ def execute_safe_retraining(
 
         # Quality Gate: New model MAE must not be worse than 1.25x the previous baseline
         if new_val_mae > (prev_mae * 1.25):
-            # Rollback
-            if backup_model_file.exists():
-                shutil.copy2(backup_model_file, BEST_MODEL_FILE)
-            if backup_metrics_file.exists():
-                shutil.copy2(backup_metrics_file, METRICS_FILE)
+            # Clean up candidate files; live production models were never touched
+            if candidate_model_file.exists():
+                try:
+                    candidate_model_file.unlink()
+                except Exception:
+                    pass
+            if candidate_metrics_file.exists():
+                try:
+                    candidate_metrics_file.unlink()
+                except Exception:
+                    pass
 
             training_record.status = "rolled_back"
             training_record.ended_at = datetime.now(timezone.utc)
@@ -251,7 +259,18 @@ def execute_safe_retraining(
                 "metrics": metrics,
             }
 
-        # 4. Promotion Success: update database metadata
+        # 4. Promotion Success: Backup existing active model and atomically promote candidate
+        if BEST_MODEL_FILE.exists():
+            shutil.copy2(BEST_MODEL_FILE, backup_model_file)
+        if METRICS_FILE.exists():
+            shutil.copy2(METRICS_FILE, backup_metrics_file)
+
+        if candidate_model_file.exists():
+            os.replace(candidate_model_file, BEST_MODEL_FILE)
+        if candidate_metrics_file.exists():
+            os.replace(candidate_metrics_file, METRICS_FILE)
+
+        # Update database metadata
         if existing_meta:
             existing_meta.is_active = False
 

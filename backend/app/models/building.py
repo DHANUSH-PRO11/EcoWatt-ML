@@ -15,6 +15,7 @@ class Building(Base):
     location = Column(String(128), nullable=False, default="Main Campus / Residential")
     description = Column(String(256), nullable=True)
     floor_area_sqm = Column(Float, nullable=True)  # Square metres for energy intensity calculations
+    max_power_kw = Column(Float, nullable=True)  # Configurable maximum power threshold for facility
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -30,6 +31,7 @@ class EnergyMeter(Base):
     building_id = Column(Integer, ForeignKey("buildings.id", ondelete="CASCADE"), nullable=False, index=True)
     meter_type = Column(String(32), default="main", nullable=False)  # 'main', 'submeter', 'solar', 'hvac'
     status = Column(String(32), default="active", nullable=False)  # 'active', 'inactive', 'maintenance'
+    max_power_kw = Column(Float, nullable=True)  # Configurable maximum power threshold for individual meter
     installed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 

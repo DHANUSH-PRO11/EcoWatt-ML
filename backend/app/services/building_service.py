@@ -33,6 +33,7 @@ def create_building(db: Session, data: BuildingCreate) -> Building:
         location=data.location,
         description=data.description,
         floor_area_sqm=data.floor_area_sqm,
+        max_power_kw=data.max_power_kw,
     )
     db.add(building)
     db.commit()
@@ -87,6 +88,7 @@ def add_meter(db: Session, building_id: int, data: EnergyMeterCreate) -> EnergyM
         building_id=building_id,
         meter_type=data.meter_type.lower(),
         status=data.status.lower(),
+        max_power_kw=data.max_power_kw,
         installed_at=data.installed_at,
     )
     db.add(meter)
