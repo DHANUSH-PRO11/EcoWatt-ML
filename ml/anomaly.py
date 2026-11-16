@@ -8,10 +8,7 @@ from ml.config import ISOLATION_FOREST_FILE, DEFAULT_CONTAMINATION
 
 
 class ConsumptionAnomalyDetector:
-    """
-    Isolation Forest-based anomaly detector for residential electricity consumption.
-    Detects abnormal spikes, unexpected overnight baseload inflation, and irregular patterns.
-    """
+   
 
     def __init__(self, contamination: float = DEFAULT_CONTAMINATION, random_state: int = 42):
         self.contamination = contamination
