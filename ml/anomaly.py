@@ -24,13 +24,7 @@ class ConsumptionAnomalyDetector:
         self.max_raw_score = 1.0
 
     def _extract_anomaly_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Extract descriptive features for anomaly detection:
-        - Absolute energy consumption
-        - Deviation ratio from 24h rolling average
-        - Hour of the day (for recognizing diurnal context)
-        - Weekend indicator
-        """
+        
         feats = pd.DataFrame(index=df.index)
         feats["energy_kwh"] = df["energy_kwh"].values
 
