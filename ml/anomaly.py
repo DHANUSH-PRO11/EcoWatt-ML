@@ -28,7 +28,6 @@ class ConsumptionAnomalyDetector:
         feats = pd.DataFrame(index=df.index)
         feats["energy_kwh"] = df["energy_kwh"].values
 
-        # Rolling baseline approximation
         if "rolling_mean_24" in df.columns:
             rolling_base = df["rolling_mean_24"].values
         else:
