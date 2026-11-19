@@ -33,7 +33,7 @@ def process_uci_raw_dataset(
 
     print(f"Reading raw UCI dataset from: {raw_path} ...")
 
-    # The UCI dataset is semicolon delimited with '?' representing missing measurements
+    
     chunks = []
     for chunk in pd.read_csv(
         raw_path,
