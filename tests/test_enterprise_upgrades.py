@@ -107,3 +107,12 @@ def test_permutation_explainability_and_calibration():
             assert "residual_distribution" in meta
             assert "coverage_90_pct" in meta["residual_distribution"]
             assert "coverage_95_pct" in meta["residual_distribution"]
+
+
+def test_all_building_archetypes_supported():
+    """Verify that household, commercial, office, laboratory, and classroom facility types are registered."""
+    res = client.get("/api/buildings")
+    assert res.status_code == 200
+    buildings = res.json()
+    types_found = {b["building_type"] for b in buildings}
+    assert {"household", "commercial", "office", "laboratory", "classroom"}.issubset(types_found)
