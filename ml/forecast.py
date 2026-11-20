@@ -37,6 +37,7 @@ class RecursiveForecaster:
         self.baseline_model = None
         self.residual_std = 0.25
         self.model_name = "unknown"
+        self.feature_columns = None
         self._load_model_and_metadata()
 
     def _load_model_and_metadata(self):
@@ -55,6 +56,7 @@ class RecursiveForecaster:
                 metadata = json.load(f)
                 self.residual_std = metadata.get("residual_std", 0.25)
                 self.model_name = metadata.get("best_model_name", "hist_gradient_boosting")
+                self.feature_columns = metadata.get("feature_columns", None)
 
     def forecast(
         self,
@@ -95,6 +97,7 @@ class RecursiveForecaster:
                 target_dt=next_timestamp,
                 target_col=TARGET_COL,
                 dt_col=DATETIME_COL,
+                feature_columns=self.feature_columns,
             )
 
             # Point prediction

@@ -8,7 +8,10 @@ from ml.config import ISOLATION_FOREST_FILE, DEFAULT_CONTAMINATION
 
 
 class ConsumptionAnomalyDetector:
-   
+    """
+    Isolation Forest-based anomaly detector for residential and institutional electricity consumption.
+    Detects abnormal spikes, unexpected baseload inflation, and irregular operational draw.
+    """
 
     def __init__(self, contamination: float = DEFAULT_CONTAMINATION, random_state: int = 42):
         self.contamination = contamination
@@ -24,7 +27,13 @@ class ConsumptionAnomalyDetector:
         self.max_raw_score = 1.0
 
     def _extract_anomaly_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        
+        """
+        Extract features for anomaly detection:
+        - Consumption level (energy_kwh)
+        - 24-hour baseline deviation / residual ratio
+        - Hour of the day (diurnal context)
+        - Weekend indicator (occupancy shifts)
+        """
         feats = pd.DataFrame(index=df.index)
         feats["energy_kwh"] = df["energy_kwh"].values
 

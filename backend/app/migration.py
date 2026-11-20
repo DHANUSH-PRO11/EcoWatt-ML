@@ -159,6 +159,33 @@ def run_safe_migrations():
                 conn.execute(text(f"UPDATE anomaly_alerts SET building_id = {b1.id}, meter_id = {m1.id} WHERE building_id IS NULL;"))
                 conn.execute(text(f"UPDATE forecast_records SET building_id = {b1.id}, meter_id = {m1.id} WHERE building_id IS NULL;"))
 
+        # Ensure all 5 facility archetypes are represented (household, commercial, office, laboratory, classroom)
+        office_bld = db.query(Building).filter(Building.building_type == "office").first()
+        if not office_bld:
+            office_bld = Building(
+                name="Central Corporate Office",
+                code="BLD-OFC-04",
+                building_type="office",
+                location="Central Administrative Quad",
+                description="Administrative office complex with central HVAC and workstation sub-panels",
+                floor_area_sqm=520.0,
+                max_power_kw=100.0,
+            )
+            db.add(office_bld)
+            db.commit()
+            db.refresh(office_bld)
+            db.add(
+                EnergyMeter(
+                    meter_code="MTR-OFC-001",
+                    name="Office Main Incomer",
+                    building_id=office_bld.id,
+                    meter_type="main",
+                    status="active",
+                    max_power_kw=100.0,
+                )
+            )
+            db.commit()
+
         # 4. Ensure default CarbonSetting exists
         carbon_count = db.query(CarbonSetting).count()
         if carbon_count == 0:
